@@ -11,6 +11,8 @@ import java.awt.geom.CubicCurve2D;
 import java.awt.geom.GeneralPath;
 import java.util.ArrayList;
 import java.util.List;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 public class FlowChartPanel extends JPanel {
     private List<Task> tasks;
@@ -25,14 +27,51 @@ public class FlowChartPanel extends JPanel {
     private int arrowControlX, arrowControlY;
     private Connector draggingConnector;
 
+    private int currentShapeType = 1;
+
     public FlowChartPanel() {
         tasks = new ArrayList<>();
         selectedTask = null;
 
         addMouseListener(new TaskClickListener());
         addMouseMotionListener(new TaskDragListener());
+
+        JPopupMenu shapeMenu = createShapeMenu();
+        this.setComponentPopupMenu(shapeMenu);
+    }
+    private JPopupMenu createShapeMenu() {
+        JPopupMenu menu = new JPopupMenu();
+
+        // Create menu items for different shape types
+        JMenuItem rectangleItem = new JMenuItem("Rectangle");
+        JMenuItem ellipseItem = new JMenuItem("Ellipse");
+
+        // Add action listeners to menu items
+        rectangleItem.addActionListener(new ShapeTypeListener(1));  // 1 corresponds to Rectangle
+        ellipseItem.addActionListener(new ShapeTypeListener(2));    // 2 corresponds to Ellipse
+
+        // Add menu items to the menu
+        menu.add(rectangleItem);
+        menu.add(ellipseItem);
+
+        return menu;
     }
 
+    private class ShapeTypeListener implements ActionListener {
+        private int shapeType;
+
+        public ShapeTypeListener(int shapeType) {
+            this.shapeType = shapeType;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (selectedTask != null) {
+                selectedTask.setShapeType(shapeType);
+                repaint();
+            }
+        }
+    }
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -51,14 +90,51 @@ public class FlowChartPanel extends JPanel {
     }
 
     private void drawTask(Graphics g, Task task) {
-        g.setColor(Color.WHITE);
-        g.fillRect(task.getX(), task.getY(), 100, 50);
+        String label = task.getLabel();
+
+        // Calculate the size based on the label length
+        FontMetrics metrics = g.getFontMetrics();
+        int labelWidth = metrics.stringWidth(label);
+        int labelHeight = metrics.getHeight();
+
+        // Set the task position
+        int x = task.getX();
+        int y = task.getY();
+
+        // Add padding to the calculated width and height
+        int taskWidth = labelWidth + 20;
+        int taskHeight = labelHeight + 20;
+
+        // Draw the shape based on the task's shape type
+        int shapeType = task.getShapeType();
+        switch (shapeType) {
+            case 1:  // Rectangle
+                g.setColor(Color.WHITE);
+                g.fillRect(x, y, taskWidth, taskHeight);
+                g.setColor(Color.BLACK);
+                g.drawRect(x, y, taskWidth, taskHeight);
+                break;
+            case 2:  // Ellipse (you can add more shapes as needed)
+                g.setColor(Color.WHITE);
+                g.fillOval(x, y, taskWidth, taskHeight);
+                g.setColor(Color.BLACK);
+                g.drawOval(x, y, taskWidth, taskHeight);
+                break;
+            // Add more cases for different shapes
+        }
+
+        // Center the label inside the textbox
+        int textX = x + (taskWidth - labelWidth) / 2;
+        int textY = y + (taskHeight - labelHeight) / 2 + metrics.getAscent();
+
         g.setColor(Color.BLACK);
-        g.drawRect(task.getX(), task.getY(), 100, 50);
-        g.setColor(Color.BLACK);
-        g.drawString(task.getLabel(), task.getX() + 10, task.getY() + 30);
+        g.drawString(label, textX, textY);
     }
 
+    public void setCurrentShapeType(int shapeType) {
+        this.currentShapeType = shapeType;
+        repaint();
+    }
     private void drawConnector(Graphics g, Connector connector) {
         Task source = connector.getSource();
         Task destination = connector.getDestination();
@@ -67,25 +143,48 @@ public class FlowChartPanel extends JPanel {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setStroke(new BasicStroke(2));
 
-        int x1 = source.getX() + 100;
-        int y1 = source.getY() + 25;
+        int x1 = source.getX() + getTaskWidth(source);
+        int y1 = source.getY() + getTaskHeight(source) / 2;
         int x2 = destination.getX();
-        int y2 = destination.getY() + 25;
+        int y2 = destination.getY() + getTaskHeight(destination) / 2;
 
-        drawArrow(g2d, x1, y1, x2, y2);
+        drawArrow(g2d, x1, y1, x2, y2, connector);
 
         g2d.setStroke(new BasicStroke(1));
     }
 
-    private void drawArrow(Graphics2D g2d, int x1, int y1, int x2, int y2) {
+
+
+    private int getTaskWidth(Task task) {
+        return task.getShapeType() == 1 ? 100 : 50; // Assuming Rectangle has a width of 100, and Ellipse has a width of 50
+    }
+
+    private int getTaskHeight(Task task) {
+        return task.getShapeType() == 1 ? 50 : 25; // Assuming Rectangle has a height of 50, and Ellipse has a height of 25
+    }
+    private void drawArrow(Graphics2D g2d, int x1, int y1, int x2, int y2, Connector connector) {
         int arrowSize = 10;
 
-        // Draw a straight arrow
-        g2d.drawLine(x1, y1, x2, y2);
+        // Check if the connector is selected and has a control point
+        if (connector == selectedConnector && connector.getControlPoint() != null) {
+            int arrowControlX = connector.getControlPoint().x;
+            int arrowControlY = connector.getControlPoint().y;
 
-        // Draw arrowhead at the end of the line
-        double angle = Math.atan2(y2 - y1, x2 - x1);
-        drawArrowhead(g2d, x2, y2, angle, arrowSize);
+            // Draw a straight arrow if no control point is set
+            g2d.drawLine(x1, y1, arrowControlX, arrowControlY);
+            g2d.drawLine(arrowControlX, arrowControlY, x2, y2);
+
+            // Draw arrowheads at the ends of the line
+            drawArrowhead(g2d, x1, y1, arrowControlX, arrowControlY);
+            drawArrowhead(g2d, x2, y2, x2, y2);
+        } else {
+            // Draw a straight arrow if no control point is set
+            g2d.drawLine(x1, y1, x2, y2);
+
+            // Draw arrowhead at the end of the line
+            double angle = Math.atan2(y2 - y1, x2 - x1);
+            drawArrowhead(g2d, x2, y2, angle, arrowSize);
+        }
     }
 
     private void drawArrowhead(Graphics2D g2d, int x, int y, double angle, int arrowSize) {
@@ -114,7 +213,7 @@ public class FlowChartPanel extends JPanel {
             Graphics2D g2d = (Graphics2D) g;
             g2d.setStroke(new BasicStroke(2));
 
-            drawArrow(g2d, x1, y1, x2, y2);
+            drawArrow(g2d, x1, y1, x2, y2, connector);
 
             g2d.setStroke(new BasicStroke(1));
         }

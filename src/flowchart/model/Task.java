@@ -2,18 +2,31 @@
 package flowchart.model;
 
 import java.awt.Color;
+import java.awt.*;
 
 public class Task {
     private String label;
     private int x;
     private int y;
-    private Color color; // Add Color attribute
+    private Shape shape; // Add a Shape property
+    private int shapeType;
 
     public Task(String label) {
         this.label = label;
-        this.x = 0;
-        this.y = 0;
-        this.color = Color.BLUE; // Default color
+        this.shape = new Rectangle(); // Default shape is Rectangle
+    }
+
+    // Add a getter and setter for the shape
+    public Shape getShape() {
+        return shape;
+    }
+
+    public int getShapeType() {
+        return shapeType;
+    }
+
+    public void setShapeType(int shapeType) {
+        this.shapeType = shapeType;
     }
 
     public String getLabel() {
@@ -36,11 +49,4 @@ public class Task {
         this.y = y;
     }
 
-    public Color getColor() {
-        return color;
-    }
-
-    public void setColor(Color color) {
-        this.color = color;
-    }
 }
